@@ -162,6 +162,7 @@ func (codec *Decoder) consume(s string) error {
 
 func (codec *Decoder) JSONDecode(data any) error {
 	vdata := reflect.ValueOf(data)
+	//fmt.Println(vdata.Type().Name())
 	if vdata.Kind() != reflect.Pointer || vdata.IsNil() {
 		return errors.New("parameter must be a vaild pointer")
 	}
@@ -180,9 +181,7 @@ func (codec *Decoder) Read() (string, error) {
 }
 
 func (codec *Decoder) decode(data reflect.Value) error {
-	if !data.CanInterface() {
-		return nil
-	}
+	//fmt.Println(data.Type(), data)
 	switch data.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		str, err := codec.Read()
@@ -331,10 +330,12 @@ func (codec *Decoder) decode(data reflect.Value) error {
 			if err != nil {
 				return err
 			}
-			err = codec.decode(data.MapIndex(key))
+			val := reflect.New(data.Type().Elem()).Elem()
+			err = codec.decode(val)
 			if err != nil {
 				return err
 			}
+			data.SetMapIndex(key, val)
 			str, err = codec.Read()
 			if err != nil {
 				return err
@@ -398,7 +399,7 @@ func (codec *Decoder) decode(data reflect.Value) error {
 		return nil
 
 	case reflect.Interface:
-		fmt.Println(data)
+		//fmt.Println(data)
 		err := codec.decode(data.Elem())
 		if err != nil {
 			return err

@@ -3,7 +3,6 @@ package rpc_yqaty
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"go/token"
 	"io"
 	"net"
@@ -40,15 +39,16 @@ type ServerCodec struct {
 }
 
 func (scodec *ServerCodec) ReadRequestHeader(req *Request) error {
+	//fmt.Println("Server: ReadRequestHeader", reflect.TypeOf(req))
 	return scodec.decoder.JSONDecode(req)
 }
 
 func (scodec *ServerCodec) ReadRequestBody(data any) error {
-	fmt.Println(reflect.TypeOf(data))
+	//fmt.Println("Server: ReadRequestBody", reflect.TypeOf(data))
 	return scodec.decoder.JSONDecode(data)
 }
 
-func (scodec *ServerCodec) WirteResponse(resp *Response, data *Data) error {
+func (scodec *ServerCodec) WriteResponse(resp *Response, data *Data) error {
 	scodec.encoder.s = new(bytes.Buffer)
 	//fmt.Println(resp, reflect.TypeOf(resp.Reply))
 	if err := scodec.encoder.JSONEncode(resp); err != nil {
@@ -58,6 +58,7 @@ func (scodec *ServerCodec) WirteResponse(resp *Response, data *Data) error {
 		return err
 	}
 	scodec.encoder.s.WriteString(" ")
+	//fmt.Println(scodec.encoder.s.String())
 	scodec.conn.Write(scodec.encoder.s.Bytes())
 	return nil
 }
@@ -107,7 +108,7 @@ func (server *Server) Register(name string, method any) error {
 
 func (server *Server) SendResponse(codec ServerCodec, sending *sync.Mutex, resp *Response, data *Data) {
 	sending.Lock()
-	codec.WirteResponse(resp, data)
+	codec.WriteResponse(resp, data)
 	sending.Unlock()
 }
 
@@ -117,18 +118,18 @@ func (server *Server) DealRequest(codec ServerCodec, sending *sync.Mutex, wg *sy
 	fun := method.Value
 	reply := reflect.New(method.ReplyType.Elem())
 	rcvr := reflect.New(method.Method.In(0).Elem())
-	fmt.Println("WE", reply)
+	//fmt.Println("WE", reply)
 	rerrors := fun.Call([]reflect.Value{rcvr, args, reply})
 	var err error
 	if rerrors[0].Interface() != nil {
 		err = rerrors[0].Interface().(error)
 	}
-	fmt.Println(reply.Elem(), err)
+	//fmt.Println(reply.Elem(), err)
 	if err != nil {
 		server.SendResponse(codec, sending, &Response{req.Seq, err.Error()}, &Data{nil})
 		return
 	}
-	fmt.Println(reply)
+	//fmt.Println(reply)
 	server.SendResponse(codec, sending, &Response{req.Seq, ""}, &Data{reply.Interface()})
 }
 
@@ -155,7 +156,7 @@ func (server *Server) ServeConn(codec ServerCodec) {
 		}
 		args := reflect.New(method.ArgsType)
 		err = codec.ReadRequestBody(args.Interface())
-		fmt.Println(err)
+		//fmt.Println(err)
 		if err != nil {
 			if err == io.EOF {
 				break

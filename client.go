@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"reflect"
 	"sync"
 	"text/scanner"
 	"time"
@@ -21,7 +20,7 @@ type ClientCodec struct {
 
 func (codec *ClientCodec) WriteRequest(req *Request, data any) error {
 	codec.encoder.s = new(bytes.Buffer)
-	fmt.Println("debug", codec.encoder.s.Bytes(), data, *req)
+	//fmt.Println("debug", codec.encoder.s.Bytes(), data, *req)
 	if err := codec.encoder.JSONEncode(req); err != nil {
 		fmt.Println(err)
 		return err
@@ -30,6 +29,7 @@ func (codec *ClientCodec) WriteRequest(req *Request, data any) error {
 		return err
 	}
 	codec.encoder.s.WriteString(" ")
+	//fmt.Println(codec.encoder.s.String())
 	_, err := codec.conn.Write(codec.encoder.s.Bytes())
 	return err
 }
@@ -39,7 +39,7 @@ func (codec *ClientCodec) ReadResponseHeader(resp *Response) error {
 }
 
 func (codec *ClientCodec) ReadResponseBody(data *Data) error {
-	//fmt.Println(resp., reflect.TypeOf(resp).Elem().Field(0))
+	//fmt.Println("Client:ReadResponseBody", reflect.TypeOf(data))
 	return codec.decoder.JSONDecode(data)
 }
 
@@ -69,6 +69,8 @@ type Client struct {
 }
 
 func (client *Client) SendRequest(req *Request, data any) error {
+	client.mutex.Lock()
+	defer client.mutex.Unlock()
 	if err := client.codec.WriteRequest(req, data); err != nil {
 		return err
 	}
@@ -86,6 +88,7 @@ func (client *Client) Listen() {
 	for {
 		resp := Response{}
 		err = client.codec.ReadResponseHeader(&resp)
+		//fmt.Println("response: ", resp.Seq)
 		if err != nil {
 			break
 		}
@@ -98,19 +101,20 @@ func (client *Client) Listen() {
 			continue
 		}
 		if resp.Error != "" {
+			client.codec.ReadResponseBody(nil)
 			query.Error = errors.New(resp.Error)
 			query.done()
 			continue
 		}
 		data := Data{}
 		data.Reply = query.Reply
-		fmt.Println("debug", reflect.ValueOf(query.Reply), reflect.TypeOf(query.Reply), data.Reply)
+		//fmt.Println("debug", reflect.ValueOf(query.Reply), reflect.TypeOf(query.Reply), data.Reply)
 		err = client.codec.ReadResponseBody(&data)
 		if err != nil {
 			break
 		}
 		query.Reply = data.Reply
-		fmt.Println(reflect.ValueOf(data.Reply).Elem())
+		//fmt.Println(reflect.ValueOf(data.Reply).Elem())
 		query.done()
 	}
 	client.mutex.Lock()
@@ -163,21 +167,21 @@ func (client *Client) Call(name string, args any, reply any) error {
 			query.Error = errors.New("can not receive response")
 			break
 		}
-		query := Query{Method: name, Args: args, Reply: reply, Error: nil, Done: make(chan *Query, 1)}
+		query = Query{Method: name, Args: args, Reply: reply, Error: nil, Done: make(chan *Query, 1)}
 		client.mutex.Lock()
 		go client.Deal(&query)
+		client.mutex.Unlock()
 	}
 	return query.Error
 }
 
 func (client *Client) Close() error {
 	client.mutex.Lock()
+	defer client.mutex.Unlock()
 	if client.closing {
-		client.mutex.Unlock()
 		return errors.New("the connect is shut down")
 	}
 	client.closing = true
-	client.mutex.Unlock()
 	return client.codec.conn.Close()
 }
 
