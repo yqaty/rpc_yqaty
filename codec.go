@@ -97,10 +97,7 @@ func (codec *Encoder) encode(data reflect.Value) error {
 			codec.s.WriteString("null")
 			return nil
 		}
-		for data.Kind() == reflect.Pointer {
-			data = data.Elem()
-		}
-		if err := codec.encode(data); err != nil {
+		if err := codec.encode(data.Elem()); err != nil {
 			return err
 		}
 		return nil
