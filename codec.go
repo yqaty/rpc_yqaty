@@ -162,12 +162,10 @@ func (codec *Decoder) consume(s string) error {
 
 func (codec *Decoder) JSONDecode(data any) error {
 	vdata := reflect.ValueOf(data)
-	//fmt.Println(vdata.Type().Name())
 	if vdata.Kind() != reflect.Pointer || vdata.IsNil() {
 		return errors.New("parameter must be a vaild pointer")
 	}
 	err := codec.decode(vdata)
-	//vdata.Elem().Set(value.Elem())
 	return err
 }
 
@@ -181,7 +179,9 @@ func (codec *Decoder) Read() (string, error) {
 }
 
 func (codec *Decoder) decode(data reflect.Value) error {
-	//fmt.Println(data.Type(), data)
+	if !data.CanInterface() {
+		return nil
+	}
 	switch data.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		str, err := codec.Read()
@@ -294,10 +294,12 @@ func (codec *Decoder) decode(data reflect.Value) error {
 		}
 		cnt := 0
 		for str != "]" {
-			err := codec.decode(data.Index(cnt))
+			val := reflect.New(data.Type().Elem()).Elem()
+			err := codec.decode(val)
 			if err != nil {
 				return err
 			}
+			data.Index(cnt).Set(val)
 			str, err = codec.Read()
 			if err != nil {
 				return err
@@ -376,30 +378,25 @@ func (codec *Decoder) decode(data reflect.Value) error {
 			if err != nil {
 				return err
 			}
-			//fmt.Println("QWQ", name, len(name))
 			name = name[1 : len(name)-1]
 			err = codec.consume(":")
 			if err != nil {
 				return err
 			}
 			_, bo := data.Type().FieldByName(name)
-			//fmt.Println("bo", bo, name, data)
 			if bo {
 				if err := codec.decode(data.FieldByName(name)); err != nil {
 					return err
 				}
 			}
-			//fmt.Println("deqd", str, err)
 			str, err = codec.Read()
 			if err != nil {
 				return err
 			}
-			//fmt.Println(str)
 		}
 		return nil
 
 	case reflect.Interface:
-		//fmt.Println(data)
 		err := codec.decode(data.Elem())
 		if err != nil {
 			return err
@@ -424,7 +421,6 @@ type Struct2 struct {
 	Mp map[int]string
 	Ar []int
 	As []string
-	//a  int
 }
 
 type Struct3 struct {

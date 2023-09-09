@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"sync"
 	"text/scanner"
+	"time"
 )
 
 type MethodType struct {
@@ -39,18 +40,15 @@ type ServerCodec struct {
 }
 
 func (scodec *ServerCodec) ReadRequestHeader(req *Request) error {
-	//fmt.Println("Server: ReadRequestHeader", reflect.TypeOf(req))
 	return scodec.decoder.JSONDecode(req)
 }
 
 func (scodec *ServerCodec) ReadRequestBody(data any) error {
-	//fmt.Println("Server: ReadRequestBody", reflect.TypeOf(data))
 	return scodec.decoder.JSONDecode(data)
 }
 
 func (scodec *ServerCodec) WriteResponse(resp *Response, data *Data) error {
 	scodec.encoder.s = new(bytes.Buffer)
-	//fmt.Println(resp, reflect.TypeOf(resp.Reply))
 	if err := scodec.encoder.JSONEncode(resp); err != nil {
 		return err
 	}
@@ -58,7 +56,6 @@ func (scodec *ServerCodec) WriteResponse(resp *Response, data *Data) error {
 		return err
 	}
 	scodec.encoder.s.WriteString(" ")
-	//fmt.Println(scodec.encoder.s.String())
 	scodec.conn.Write(scodec.encoder.s.Bytes())
 	return nil
 }
@@ -112,24 +109,35 @@ func (server *Server) SendResponse(codec ServerCodec, sending *sync.Mutex, resp 
 	sending.Unlock()
 }
 
+func (server *Server) call(fun reflect.Value, rcvr reflect.Value, args reflect.Value, reply reflect.Value, rerrors *[]reflect.Value, flag chan struct{}, A *int) {
+	*rerrors = fun.Call([]reflect.Value{rcvr, args, reply})
+	flag <- struct{}{}
+}
+
 func (server *Server) DealRequest(codec ServerCodec, sending *sync.Mutex, wg *sync.WaitGroup, req *Request, args reflect.Value) {
 	defer wg.Done()
 	method := server.Mp[req.MethodName]
 	fun := method.Value
 	reply := reflect.New(method.ReplyType.Elem())
 	rcvr := reflect.New(method.Method.In(0).Elem())
-	//fmt.Println("WE", reply)
-	rerrors := fun.Call([]reflect.Value{rcvr, args, reply})
+	flag := make(chan struct{})
+	var rerrors []reflect.Value
+	go server.call(fun, rcvr, args, reply, &rerrors, flag, new(int))
+	select {
+	case <-time.After(5 * time.Second):
+		server.SendResponse(codec, sending, &Response{req.Seq, "TLE!"}, &Data{nil})
+		return
+	case <-flag:
+		break
+	}
 	var err error
 	if rerrors[0].Interface() != nil {
 		err = rerrors[0].Interface().(error)
 	}
-	//fmt.Println(reply.Elem(), err)
 	if err != nil {
 		server.SendResponse(codec, sending, &Response{req.Seq, err.Error()}, &Data{nil})
 		return
 	}
-	//fmt.Println(reply)
 	server.SendResponse(codec, sending, &Response{req.Seq, ""}, &Data{reply.Interface()})
 }
 
@@ -156,7 +164,6 @@ func (server *Server) ServeConn(codec ServerCodec) {
 		}
 		args := reflect.New(method.ArgsType)
 		err = codec.ReadRequestBody(args.Interface())
-		//fmt.Println(err)
 		if err != nil {
 			if err == io.EOF {
 				break

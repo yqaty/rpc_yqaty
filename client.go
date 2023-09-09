@@ -20,7 +20,6 @@ type ClientCodec struct {
 
 func (codec *ClientCodec) WriteRequest(req *Request, data any) error {
 	codec.encoder.s = new(bytes.Buffer)
-	//fmt.Println("debug", codec.encoder.s.Bytes(), data, *req)
 	if err := codec.encoder.JSONEncode(req); err != nil {
 		fmt.Println(err)
 		return err
@@ -29,7 +28,6 @@ func (codec *ClientCodec) WriteRequest(req *Request, data any) error {
 		return err
 	}
 	codec.encoder.s.WriteString(" ")
-	//fmt.Println(codec.encoder.s.String())
 	_, err := codec.conn.Write(codec.encoder.s.Bytes())
 	return err
 }
@@ -39,7 +37,6 @@ func (codec *ClientCodec) ReadResponseHeader(resp *Response) error {
 }
 
 func (codec *ClientCodec) ReadResponseBody(data *Data) error {
-	//fmt.Println("Client:ReadResponseBody", reflect.TypeOf(data))
 	return codec.decoder.JSONDecode(data)
 }
 
@@ -88,7 +85,6 @@ func (client *Client) Listen() {
 	for {
 		resp := Response{}
 		err = client.codec.ReadResponseHeader(&resp)
-		//fmt.Println("response: ", resp.Seq)
 		if err != nil {
 			break
 		}
@@ -108,13 +104,11 @@ func (client *Client) Listen() {
 		}
 		data := Data{}
 		data.Reply = query.Reply
-		//fmt.Println("debug", reflect.ValueOf(query.Reply), reflect.TypeOf(query.Reply), data.Reply)
 		err = client.codec.ReadResponseBody(&data)
 		if err != nil {
 			break
 		}
 		query.Reply = data.Reply
-		//fmt.Println(reflect.ValueOf(data.Reply).Elem())
 		query.done()
 	}
 	client.mutex.Lock()
@@ -163,7 +157,7 @@ func (client *Client) Call(name string, args any, reply any) error {
 		client.mutex.Lock()
 		delete(client.pending, query.seq)
 		client.mutex.Unlock()
-		if cnt++; cnt >= 0 {
+		if cnt++; cnt >= 1 {
 			query.Error = errors.New("can not receive response")
 			break
 		}
