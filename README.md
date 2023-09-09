@@ -37,6 +37,7 @@ func main(){
     client.Dial("127.0.0.1:9090")
     A := new(int)
     client.Call("add", Struct1{1, 2}, A)
+    client.Close()
 }
 
 ```
