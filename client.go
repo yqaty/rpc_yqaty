@@ -131,6 +131,8 @@ func (client *Client) Dial(addr string) error {
 }
 
 func (client *Client) Deal(query *Query) {
+	client.mutex.Lock()
+	defer client.mutex.Unlock()
 	if client.closing {
 		query.done()
 		query.Error = errors.New("the connection is shut down")
@@ -147,9 +149,7 @@ func (client *Client) Call(name string, args any, reply any) error {
 	query := Query{Method: name, Args: args, Reply: reply, Error: nil, Done: make(chan *Query, 1)}
 	tick := time.NewTicker(5 * time.Second)
 	defer tick.Stop()
-	client.mutex.Lock()
 	go client.Deal(&query)
-	client.mutex.Unlock()
 	cnt := 0
 	select {
 	case <-query.Done:
@@ -163,9 +163,7 @@ func (client *Client) Call(name string, args any, reply any) error {
 			break
 		}
 		query = Query{Method: name, Args: args, Reply: reply, Error: nil, Done: make(chan *Query, 1)}
-		client.mutex.Lock()
 		go client.Deal(&query)
-		client.mutex.Unlock()
 	}
 	return query.Error
 }
