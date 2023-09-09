@@ -92,7 +92,7 @@ func (codec *Encoder) encode(data reflect.Value) error {
 		fmt.Fprintf(codec.s, "\"%s\"", data.String())
 		return nil
 
-	case reflect.Pointer:
+	case reflect.Pointer, reflect.Interface:
 		if data.IsZero() {
 			codec.s.WriteString("null")
 			return nil
@@ -119,16 +119,6 @@ func (codec *Encoder) encode(data reflect.Value) error {
 			}
 		}
 		codec.s.WriteString("}")
-		return nil
-
-	case reflect.Interface:
-		if data.IsZero() {
-			codec.s.WriteString("null")
-			return nil
-		}
-		if err := codec.encode(data.Elem()); err != nil {
-			return err
-		}
 		return nil
 
 	default:
