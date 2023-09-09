@@ -132,7 +132,6 @@ func (client *Client) Dial(addr string) error {
 
 func (client *Client) Deal(query *Query) {
 	client.mutex.Lock()
-	defer client.mutex.Unlock()
 	if client.closing {
 		query.done()
 		query.Error = errors.New("the connection is shut down")
@@ -142,6 +141,7 @@ func (client *Client) Deal(query *Query) {
 	client.pending[client.seq] = query
 	query.seq = client.seq
 	req := Request{MethodName: query.Method, Seq: client.seq}
+	client.mutex.Unlock()
 	client.SendRequest(&req, query.Args)
 }
 
