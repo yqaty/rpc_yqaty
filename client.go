@@ -112,6 +112,7 @@ func (client *Client) Listen() {
 		query.done()
 	}
 	client.mutex.Lock()
+	client.closing = true
 	for _, query := range client.pending {
 		query.Error = err
 		query.done()
