@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"text/scanner"
 )
 
@@ -76,14 +77,8 @@ func (codec *Encoder) encode(data reflect.Value) error {
 				codec.s.WriteString("\"")
 			}
 			codec.s.WriteString(":")
-			if data.MapIndex(key).Kind() != reflect.String && data.MapIndex(key).Kind() != reflect.Struct {
-				codec.s.WriteString("\"")
-			}
 			if err := codec.encode(data.MapIndex(key)); err != nil {
 				return err
-			}
-			if data.MapIndex(key).Kind() != reflect.String && data.MapIndex(key).Kind() != reflect.Struct {
-				codec.s.WriteString("\"")
 			}
 		}
 		codec.s.WriteString("}")
@@ -408,47 +403,14 @@ func (codec *Decoder) decode(data reflect.Value) error {
 	}
 }
 
-type Struct1 struct {
-	A int
-	B string
-	C uint
-	D bool
+func Marshal(arg any) (string, error) {
+	codec := &Encoder{new(bytes.Buffer)}
+	err := codec.JSONEncode(arg)
+	return codec.s.String(), err
 }
 
-type Struct2 struct {
-	A  *Struct1
-	B  Struct1
-	Mp map[int]string
-	Ar []int
-	As []string
+func UnMarshal(s string, rec any) error {
+	codec := &Decoder{new(scanner.Scanner)}
+	codec.s.Init(strings.NewReader(s))
+	return codec.JSONDecode(rec)
 }
-
-type Struct3 struct {
-	Struct2
-}
-
-/*func main() {
-	encoder := &Encoder{new(bytes.Buffer)}
-	A := Struct1{A: 1, B: "dsds", C: 3, D: true}
-	encoder.JSONEncode(A)
-	fmt.Println(encoder.s)
-	encoder = &Encoder{new(bytes.Buffer)}
-	encoder.JSONEncode(Struct2{A: &Struct1{A: 1, B: "dsds", C: 3, D: true}, B: Struct1{A: 1, B: "dsds", C: 3, D: true}, Mp: map[int]string{1: "adas", 2: "sdsf"}, Ar: []int{1, 2, 3}, As: []string{"1", "2", "3"}, a: 1})
-	fmt.Println(encoder.s)
-	var a *Struct2 = &Struct2{}
-	decoder := &Decoder{new(scanner.Scanner)}
-	s := "{\"A\":{\"A\":1,\"B\":\"dsds\",\"C\":3,\"D\":true},\"B\":{\"A\":1,\"B\":\"dsds\",\"C\":3,\"D\":true},\"Mp\":{\"1\":\"adas\",\"2\":\"sdsf\"},\"Ar\":[1,2,3],\"As\":[\"1\",\"2\",\"3\"]}"
-	decoder.s.Init(strings.NewReader(s))
-	decoder.JSONDecode(a)
-	encoder = &Encoder{new(bytes.Buffer)}
-	encoder.JSONEncode(a)
-	fmt.Println(a.a)
-	fmt.Println(encoder.s)
-	encoder = &Encoder{new(bytes.Buffer)}
-	encoder.JSONEncode(struct{}{})
-	fmt.Println(encoder.s)
-}*/
-
-/*
-{"A":{"A":1,"B":"dsds","C":3,"D":true},"B":{"A":1,"B":"dsds","C":3,"D":true},"Mp":{"1":"adas","2":"sdsf"},"Ar":[1,2,3],"As":["1","2","3"]}
-*/
