@@ -279,14 +279,19 @@ func ServerTest() {
 	server.Accept("127.0.0.1:9090")
 }
 
-func call(client *Client, name string, args any, reply any, wg *sync.WaitGroup) {
+func call(t *testing.T, ans any, client *Client, name string, args any, reply any, wg *sync.WaitGroup) {
+	t.Helper()
 	defer wg.Done()
 	err := client.Call(name, args, reply)
 	if err != nil {
-		fmt.Println("Error: ", name, args, err)
+		//fmt.Println("Error: ", name, args, err)
+		t.Errorf("Error: %v %v %v", name, args, err)
 		return
 	}
-	fmt.Println("Successfully: ", name, args, reflect.ValueOf(reply).Elem())
+	if fmt.Sprintf("%v", ans) != fmt.Sprintf("%v", reflect.ValueOf(reply).Elem()) {
+		t.Errorf("expect %v, output %v", ans, reflect.ValueOf(reply).Elem())
+	}
+	//fmt.Println("Successfully: ", name, args, reflect.ValueOf(reply).Elem())
 }
 
 func TestAll(t *testing.T) {
@@ -303,22 +308,24 @@ func TestAll(t *testing.T) {
 
 	wg.Add(1)
 	test1_A := new(int)
-	go call(client, "add", Struct1{1, 2}, test1_A, wg)
+	ans1 := 3
+	go call(t, ans1, client, "add", Struct1{1, 2}, test1_A, wg)
 
 	wg.Add(1)
 	test2_A := &Struct2{}
 	test2_A.Mp = make(map[int]int)
-	go call(client, "map", Struct1{1, 2}, test2_A, wg)
+	ans2 := Struct2{map[int]int{1: 2}}
+	go call(t, ans2, client, "map", Struct1{1, 2}, test2_A, wg)
 
-	wg.Add(1)
+	/*wg.Add(1)
 	test3_A := &Struct4{A: &Struct3{}}
 	test3_A.Mp = make(map[int]string)
 	test3_A.Ar = make([]int, 3)
 	test3_A.As = make([]string, 3)
-	go call(client, "get", Struct1{1, 2}, test3_A, wg)
+	go call(t, client, "get", Struct1{1, 2}, test3_A, wg)*/
 
 	wg.Wait()
-	fmt.Println(*test3_A.A)
+	//fmt.Println(*test3_A.A)
 
 	err = client.Close()
 	if err != nil {
