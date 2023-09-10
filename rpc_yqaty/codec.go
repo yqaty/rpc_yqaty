@@ -338,7 +338,7 @@ func (codec *Decoder) decode(data reflect.Value) error {
 		data.SetString(str[1 : len(str)-1])
 		return nil
 
-	case reflect.Pointer:
+	case reflect.Pointer, reflect.Interface:
 		if err := codec.decode(data.Elem()); err != nil {
 			return err
 		}
@@ -375,13 +375,6 @@ func (codec *Decoder) decode(data reflect.Value) error {
 			if err != nil {
 				return err
 			}
-		}
-		return nil
-
-	case reflect.Interface:
-		err := codec.decode(data.Elem())
-		if err != nil {
-			return err
 		}
 		return nil
 
